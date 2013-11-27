@@ -21,8 +21,8 @@ class Http private[Http] (http: CloseableHttpAsyncClient) {
     val p = Promise[Valid[HttpResponse]]
     
     val reqFuture = http.execute(req, new FutureCallback[HttpResponse] {
-      def cancelled() = p.success(Bad(new CancelledReq))
       def completed(result: HttpResponse) = p.success(Good(result))
+      def cancelled() = p.success(Bad(new CancelledReq))
       def failed(ex: Exception) = p.failure(ex)
     })
     
@@ -30,7 +30,7 @@ class Http private[Http] (http: CloseableHttpAsyncClient) {
       def cancel(): Boolean = reqFuture.cancel(true)
     }
     
-    (Res(p.future), cancellable)
+    (Res(p), cancellable)
   }
 }
 
@@ -44,6 +44,6 @@ object Http {
   }
 }
 
-trait ReqCancel { c: Cancellable =>
+trait ReqCancel extends Cancellable {
   def apply() : Unit = cancel()
 }
