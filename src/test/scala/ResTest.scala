@@ -112,15 +112,6 @@ class ResTest extends FlatSpec with Matchers {
     res.value should be (Some(Good(10)))
   }
 
-  it must "catch exception in good" in {
-    val otherException = new Exception
-    val res = Res.good {
-      throw otherException
-    }
-
-    await(res) should be (Error(otherException))
-  }
-
   it must "rescue" in {
     val rs = Res.good(5)
 

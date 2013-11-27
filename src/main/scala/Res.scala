@@ -1,9 +1,13 @@
 package co.torri.res
 
+import co.torri.res.Bad
+import co.torri.res.Error
+import co.torri.res.Good
 import scala.util._
-import concurrent.{Await, Promise, Future, ExecutionContext}
+import concurrent._
 import ExecutionContext.Implicits.global
 import concurrent.duration.Duration
+import scala.util.Success
 
 trait NoStackTrace { e: Exception =>
   override def fillInStackTrace(): Throwable = this
@@ -25,6 +29,8 @@ case class Error(e: Throwable) extends Invalid[Nothing]
 
 case class Res[R](future: Future[Valid[R]]) {
 
+  import Res.{handle, withPromise}
+
   def onComplete(f: PartialFunction[Result[R], Any]) : Unit = transform(f)
 
   def map[RR](f: R => RR) : Res[RR] = fwd { (v, p) =>
@@ -43,18 +49,15 @@ case class Res[R](future: Future[Valid[R]]) {
     if (f(v)) p.success(Good(v)) else throw new FilterFailure
   }
 
-  def transform[RR](t: PartialFunction[Result[R], RR]) : Res[RR] = {
-    val p = Promise[Valid[RR]]()
+  def transform[RR](t: PartialFunction[Result[R], RR]) : Res[RR] = withPromise[RR] { p =>
     future.onComplete {
       case Success(Good(v)) => handle(p) { p.success(Good(t(Good(v)))) }
       case Success(Bad(f)) => handle(p) { p.success(Good(t(Bad(f)))) }
       case Failure(e) => handle(p) { p.success(Good(t(Error(e)))) }
     }
-    Res(p.future)
   }
 
-  def zip[OR](other: Res[OR]) : Res[(R, OR)] = {
-    val p = Promise[Valid[(R, OR)]]()
+  def zip[OR](other: Res[OR]) : Res[(R, OR)] = withPromise[(R, OR)] { p =>
     onComplete {
       case Good(v) => other.onComplete {
         case Good(ov) => p.success(Good(v, ov))
@@ -64,7 +67,6 @@ case class Res[R](future: Future[Valid[R]]) {
       case Bad(f) => p.success(Bad(f))
       case Error(e) => p.failure(e)
     }
-    Res(p.future)
   }
 
   def isCompleted : Boolean = future.isCompleted
@@ -77,51 +79,39 @@ case class Res[R](future: Future[Valid[R]]) {
     }
   }
 
-  def rescueWith[RR >: R](rs: => Res[RR]) : Res[RR] = {
-    val p = Promise[Valid[RR]]()
+  def rescueWith[RR >: R](rs: => Res[RR]) : Res[RR] = withPromise[RR] { p =>
     onComplete {
       case Good(v) => p.success(Good(v))
       case Bad(f) => handle(p) { p.completeWith(rs.future) }
       case Error(e) => p.failure(e)
     }
-    Res(p.future)
   }
 
-  def fallbackTo[RR >: R](fb: => Res[RR]) : Res[RR] = {
-    val p = Promise[Valid[RR]]()
+  def fallbackTo[RR >: R](fb: => Res[RR]) : Res[RR] = withPromise[RR] { p =>
     onComplete {
       case Good(v) => p.success(Good(v))
       case _ => handle(p) { p.completeWith(fb.future) }
     }
-    Res(p.future)
   }
 
   def await(implicit atMost: Duration) = try Await.result(future, atMost) catch { case e: Throwable => Error(e) }
 
   @inline
-  private[this] def handle[RR](p: Promise[Valid[RR]])(f: => Unit) =
-    try { f }
-    catch {
-      case f: Failure => p.success(Bad(f))
-      case e: Throwable => p.failure(e)
-    }
-
-  @inline
-  private[this] def fwd[RR](f: (R, Promise[Valid[RR]]) => Unit) : Res[RR] = {
-    val p = Promise[Valid[RR]]()
+  private[this] def fwd[RR](f: (R, Promise[Valid[RR]]) => Unit) : Res[RR] = withPromise[RR] { p =>
     onComplete {
       case Good(v) => handle(p) { f(v, p) }
       case Bad(f) => p.success(Bad(f))
       case Error(e) => p.failure(e)
     }
-    Res(p.future)
   }
 
 }
 
 object Res {
 
-  def apply[R](v: => Valid[R]) : Res[R] = new Res(Future {
+  def apply[R](p: Promise[Valid[R]]) : Res[R] = Res(p.future)
+
+  def apply[R](v: => Valid[R]) : Res[R] = Res(Future {
     try { v } catch { case f: Failure => Bad(f) }
   })
 
@@ -137,8 +127,22 @@ object Res {
 
   def error[R](e: Throwable) : Res[R] = new Res(Future.failed(e))
 
-
   def await[R](r: Res[R])(implicit atMost: Duration) : Result[R] =
     r.await
+
+  @inline
+  private[Res] def handle[RR](p: Promise[Valid[RR]])(f: => Unit) =
+    try { f }
+    catch {
+      case f: Failure => p.success(Bad(f))
+      case e: Throwable => p.failure(e)
+    }
+
+  @inline
+  def withPromise[R](f: Promise[Valid[R]] => Unit) : Res[R] = {
+    val p = Promise[Valid[R]]()
+    handle(p) { f(p) }
+    Res(p)
+  }
 
 }
