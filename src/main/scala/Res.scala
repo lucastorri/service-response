@@ -38,7 +38,7 @@ case class Res[R](future: Future[Valid[R]]) {
     p.completeWith(f(v).future)
   }
 
-  def foreach(f: R => Unit) : Unit =  onComplete {
+  def foreach(f: R => Unit) : Unit = onComplete {
     case Good(v) => f(v)
   }
 
@@ -108,8 +108,8 @@ object Res {
 
   def apply[R](p: Promise[Valid[R]]) : Res[R] = Res(p.future)
 
-  def apply[R](v: => Valid[R]) : Res[R] = Res(Future {
-    try { v } catch { case f: Failure => Bad(f) }
+  def apply[R](v: => R) : Res[R] = Res(Future {
+    try { Good(v) } catch { case f: Failure => Bad(f) }
   })
 
   def result[R](r: Result[R]) : Res[R] = r match {

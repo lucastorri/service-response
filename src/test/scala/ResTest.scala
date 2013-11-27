@@ -135,4 +135,13 @@ class ResTest extends FlatSpec with Matchers {
     await(Res(body)) should be (Bad(failure))
   }
 
+  it must "build correctly" in {
+    def fail : Int = throw failure
+    def err : Int = throw exception
+
+    await(Res(7)) should be (Good(7))
+    await(Res(fail)) should be (Bad(failure))
+    await(Res(err)) should be (Err(exception))
+  }
+
 }
