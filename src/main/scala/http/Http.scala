@@ -13,7 +13,7 @@ class CancelledReq extends Failure("http.cancelled")
 class Http private[Http] (http: CloseableHttpAsyncClient) {
   
   @inline
-  type HttpRes = (Res[HttpResponse], Cancellable)
+  type HttpRes = (Res[HttpResponse], ReqCancel)
   
   def get(url: String) : HttpRes = execute(new HttpGet(url))
 
@@ -26,7 +26,7 @@ class Http private[Http] (http: CloseableHttpAsyncClient) {
       def failed(ex: Exception) = p.failure(ex)
     })
     
-    val cancellable : Cancellable = new Cancellable {
+    val cancellable : ReqCancel = new Cancellable with ReqCancel {
       def cancel(): Boolean = reqFuture.cancel(true)
     }
     
@@ -42,4 +42,8 @@ object Http {
     http.start()
     new Http(http)
   }
+}
+
+trait ReqCancel { c: Cancellable =>
+  def apply() : Unit = cancel()
 }
