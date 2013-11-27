@@ -96,6 +96,8 @@ case class Res[R](future: Future[Valid[R]]) {
     Res(p.future)
   }
 
+  def await(implicit atMost: Duration) = try Await.result(future, atMost) catch { case e: Throwable => Error(e) }
+
   @inline
   private[this] def handle[RR](p: Promise[Valid[RR]])(f: => Unit) =
     try { f }
@@ -135,7 +137,8 @@ object Res {
 
   def error[R](e: Throwable) : Res[R] = new Res(Future.failed(e))
 
+
   def await[R](r: Res[R])(implicit atMost: Duration) : Result[R] =
-    try Await.result(r.future, atMost) catch { case e: Throwable => Error(e) }
+    r.await
 
 }

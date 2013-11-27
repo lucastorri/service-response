@@ -1,6 +1,5 @@
 package co.torri.res.http
 
-import co.torri.res.Res.await
 import co.torri.res._
 import org.apache.http.HttpResponse
 import scala.concurrent.duration._
@@ -21,7 +20,7 @@ object HttpExample {
       .map(asPage)
 
 
-    await(t) match {
+    t.await match {
       case Good(v) => println(v)
       case Bad(f) => println(f)
       case Error(e) => e.printStackTrace
