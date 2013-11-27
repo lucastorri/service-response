@@ -45,5 +45,5 @@ object Http {
 }
 
 trait ReqCancel extends Cancellable {
-  def apply() : Unit = cancel()
+  final def apply() : Unit = cancel()
 }
