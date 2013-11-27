@@ -9,10 +9,11 @@ object HttpExample {
 
   def main(args: Array[String]) = {
 
-    implicit val waitFor = 10 seconds
+    implicit val waitFor = 10.seconds
     val http = Http()
 
     val (res, cancel) = http.get("http://example.com")
+    // cancel()
 
     val t : Res[Page] = res
       .map(checkForFailures)
@@ -23,7 +24,7 @@ object HttpExample {
     t.await match {
       case Good(v) => println(v)
       case Bad(f) => println(f)
-      case Error(e) => e.printStackTrace
+      case Err(e) => e.printStackTrace
     }
 
     res.onComplete {

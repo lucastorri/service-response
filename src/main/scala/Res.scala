@@ -1,8 +1,5 @@
 package co.torri.res
 
-import co.torri.res.Bad
-import co.torri.res.Error
-import co.torri.res.Good
 import scala.util._
 import concurrent._
 import ExecutionContext.Implicits.global
@@ -25,7 +22,7 @@ sealed trait Valid[+R] extends Result[R]
 sealed trait Invalid[+R] extends Result[R]
 case class Good[+G](v: G) extends Valid[G]
 case class Bad(f: Failure) extends Valid[Nothing]
-case class Error(e: Throwable) extends Invalid[Nothing]
+case class Err(e: Throwable) extends Invalid[Nothing]
 
 case class Res[R](future: Future[Valid[R]]) {
 
@@ -53,7 +50,7 @@ case class Res[R](future: Future[Valid[R]]) {
     future.onComplete {
       case Success(Good(v)) => handle(p) { p.success(Good(t(Good(v)))) }
       case Success(Bad(f)) => handle(p) { p.success(Good(t(Bad(f)))) }
-      case Failure(e) => handle(p) { p.success(Good(t(Error(e)))) }
+      case Failure(e) => handle(p) { p.success(Good(t(Err(e)))) }
     }
   }
 
@@ -62,10 +59,10 @@ case class Res[R](future: Future[Valid[R]]) {
       case Good(v) => other.onComplete {
         case Good(ov) => p.success(Good(v, ov))
         case Bad(f) => p.success(Bad(f))
-        case Error(e) => p.failure(e)
+        case Err(e) => p.failure(e)
       }
       case Bad(f) => p.success(Bad(f))
-      case Error(e) => p.failure(e)
+      case Err(e) => p.failure(e)
     }
   }
 
@@ -75,7 +72,7 @@ case class Res[R](future: Future[Valid[R]]) {
     future.value.map {
       case Success(Good(v)) => Good(v)
       case Success(Bad(f)) => Bad(f)
-      case Failure(t) => Error(t)
+      case Failure(t) => Err(t)
     }
   }
 
@@ -83,7 +80,7 @@ case class Res[R](future: Future[Valid[R]]) {
     onComplete {
       case Good(v) => p.success(Good(v))
       case Bad(f) => handle(p) { p.completeWith(rs.future) }
-      case Error(e) => p.failure(e)
+      case Err(e) => p.failure(e)
     }
   }
 
@@ -94,14 +91,14 @@ case class Res[R](future: Future[Valid[R]]) {
     }
   }
 
-  def await(implicit atMost: Duration) = try Await.result(future, atMost) catch { case e: Throwable => Error(e) }
+  def await(implicit atMost: Duration) = try Await.result(future, atMost) catch { case e: Throwable => Err(e) }
 
   @inline
   private[this] def fwd[RR](f: (R, Promise[Valid[RR]]) => Unit) : Res[RR] = withPromise[RR] { p =>
     onComplete {
       case Good(v) => handle(p) { f(v, p) }
       case Bad(f) => p.success(Bad(f))
-      case Error(e) => p.failure(e)
+      case Err(e) => p.failure(e)
     }
   }
 
@@ -118,7 +115,7 @@ object Res {
   def result[R](r: Result[R]) : Res[R] = r match {
     case Good(v) => good(v)
     case Bad(f) => bad(f)
-    case Error(e) => error(e)
+    case Err(e) => error(e)
   }
 
   def good[R](v: R) : Res[R] = new Res(Future(Good(v)))

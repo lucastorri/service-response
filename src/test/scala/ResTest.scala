@@ -10,7 +10,7 @@ class ResTest extends FlatSpec with Matchers {
 
   import Res.await
 
-  implicit val waitFor = 1 second
+  implicit val waitFor = 1.second
 
   val aValue = 10
   val failure = new Failure("some.failure")
@@ -20,29 +20,29 @@ class ResTest extends FlatSpec with Matchers {
   val bad : Res[Int] = Res.bad(failure)
   val error : Res[Int] = Res.error(exception)
 
-  it must "map" in {
+  "Res" must "map" in {
     await(good.map(_ + 10)) should be (Good(aValue + 10))
     await(bad.map(_ + 10)) should be (Bad(failure))
-    await(error.map(_ + 10)) should be (Error(exception))
+    await(error.map(_ + 10)) should be (Err(exception))
   }
 
   it must "catch exception on map" in {
     val otherException = new Exception
-    await(good.map(_ => throw otherException)) should be (Error(otherException))
+    await(good.map(_ => throw otherException)) should be (Err(otherException))
   }
 
   it must "flatMap" in {
     await(good.flatMap(_ => Res.good(15))) should be (Good(15))
     await(good.flatMap(_ => bad)) should be (Bad(failure))
-    await(good.flatMap(_ => error)) should be (Error(exception))
+    await(good.flatMap(_ => error)) should be (Err(exception))
 
     await(bad.flatMap(_ => good)) should be (Bad(failure))
-    await(error.flatMap(_ => good)) should be (Error(exception))
+    await(error.flatMap(_ => good)) should be (Err(exception))
   }
 
   it must "catch exception on flatMap" in {
     val otherException = new Exception
-    await(good.flatMap(_ => throw otherException)) should be (Error(otherException))
+    await(good.flatMap(_ => throw otherException)) should be (Err(otherException))
   }
 
   it must "filter" in {
@@ -51,12 +51,12 @@ class ResTest extends FlatSpec with Matchers {
     e.isInstanceOf[FilterFailure] should be (true)
 
     await(bad.filter(_ == 10)) should be (Bad(failure))
-    await(error.filter(_ == 10)) should be (Error(exception))
+    await(error.filter(_ == 10)) should be (Err(exception))
   }
 
   it must "catch exception on filter" in {
     val otherException = new Exception
-    await(good.filter(_ => throw otherException)) should be (Error(otherException))
+    await(good.filter(_ => throw otherException)) should be (Err(otherException))
   }
 
   it must "foreach" in {
@@ -75,7 +75,7 @@ class ResTest extends FlatSpec with Matchers {
     val t : PartialFunction[Result[Int], Int] = {
       case Good(v) => 1
       case Bad(f) => 2
-      case Error(e) => 3
+      case Err(e) => 3
     }
 
     await(good.transform(t)) should be (Good(1))
@@ -85,7 +85,7 @@ class ResTest extends FlatSpec with Matchers {
 
   it must "catch exception on transform" in {
     val otherException = new Exception
-    await(good.transform { case Good(v) => throw otherException }) should be (Error(otherException))
+    await(good.transform { case Good(v) => throw otherException }) should be (Err(otherException))
   }
 
   it must "zip" in {
@@ -94,11 +94,11 @@ class ResTest extends FlatSpec with Matchers {
     await(good.zip(bad)) should be (Bad(failure))
     await(bad.zip(good)) should be (Bad(failure))
 
-    await(good.zip(error)) should be (Error(exception))
-    await(error.zip(good)) should be (Error(exception))
+    await(good.zip(error)) should be (Err(exception))
+    await(error.zip(good)) should be (Err(exception))
 
     await(bad.zip(error)) should be (Bad(failure))
-    await(error.zip(bad)) should be (Error(exception))
+    await(error.zip(bad)) should be (Err(exception))
   }
 
   it must "return value" in {
@@ -117,7 +117,7 @@ class ResTest extends FlatSpec with Matchers {
 
     await(good.rescueWith(rs)) should be (Good(aValue))
     await(bad.rescueWith(rs)) should be (Good(5))
-    await(error.rescueWith(rs)) should be (Error(exception))
+    await(error.rescueWith(rs)) should be (Err(exception))
   }
 
   it must "fallback" in {
