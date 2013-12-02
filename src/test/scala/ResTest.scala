@@ -144,4 +144,50 @@ class ResTest extends FlatSpec with Matchers {
     await(Res(err)) should be (Err(exception))
   }
 
+  it must "work with for comprehension" in {
+    val newGood =
+      for {
+        g1 <- good
+        if g1 == aValue
+        g2 <- Res.good(7)
+      } yield g1 + g2
+
+    val newBad =
+      for {
+        g1 <- good
+        g2 <- bad
+      } yield g1 + g2
+
+    val newErr =
+      for {
+        g1 <- good
+        g2 <- error
+      } yield g1 + g2
+
+    val badFirst =
+      for {
+        g1 <- bad
+        g2 <- error
+      } yield g1 + g2
+
+    val errFirst = for {
+      g1 <- error
+      g2 <- bad
+    } yield g1 + g2
+
+    val filtered = for {
+      g <- Res.good(-1)
+      if g > 0
+    } yield g
+
+    await(newGood) should be (Good(aValue + 7))
+    await(newBad) should be (Bad(failure))
+    await(newErr) should be (Err(exception))
+
+    await(badFirst) should be (Bad(failure))
+    await(errFirst) should be (Err(exception))
+    val Bad(e) = await(filtered)
+    e.isInstanceOf[FilterFailure] should be (true)
+  }
+
 }

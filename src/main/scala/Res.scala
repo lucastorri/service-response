@@ -46,6 +46,15 @@ case class Res[R](future: Future[Valid[R]]) {
     if (f(v)) p.success(Good(v)) else throw new FilterFailure
   }
 
+  def withFilter(f: R => Boolean) : WithFilter = new WithFilter(f)
+
+  class WithFilter(p: R => Boolean) {
+    def map[RR](f: R => RR): Res[RR] = Res.this.filter(p).map(f)
+    def flatMap[RR](f: R => Res[RR]): Res[RR] = Res.this.filter(p).flatMap(f)
+    def foreach(f: R => Unit): Unit = Res.this.filter(p).foreach(f)
+    def withFilter(q: R => Boolean): WithFilter = new WithFilter(x => p(x) && q(x))
+  }
+
   def transform[RR](t: PartialFunction[Result[R], RR]) : Res[RR] = withPromise[RR] { p =>
     future.onComplete {
       case Success(Good(v)) => handle(p) { p.success(Good(t(Good(v)))) }

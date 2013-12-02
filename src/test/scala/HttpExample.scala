@@ -50,7 +50,6 @@ object HttpExample {
   }
 
 
-
   class NotFound extends Failure("service.notFound")
 
   case class Page(title: String)
