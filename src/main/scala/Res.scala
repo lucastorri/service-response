@@ -24,7 +24,7 @@ case class Good[+G](v: G) extends Valid[G]
 case class Bad(f: Failure) extends Valid[Nothing]
 case class Err(e: Throwable) extends Invalid[Nothing]
 
-case class Res[R](future: Future[Valid[R]]) {
+case class Res[R](future: Future[Valid[R]]) extends Serializable {
 
   import Res.{handle, withPromise}
 
